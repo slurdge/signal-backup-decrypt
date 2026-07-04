@@ -110,14 +110,31 @@ def _cmd_decrypt(args):
 
 
 def _cmd_json(args):
-    from .json_export import export_json
+    from .json import export_json
 
-    backup, _, _ = _decrypt_to_frames(args)
-    with console.status("Writing JSON…"):
-        manifest = export_json(backup, Path(args.output or "out"))
+    backup, _, files_dir = _decrypt_to_frames(args)
+    out_path = Path(args.output or "backup.zip")
+
+    if files_dir and not args.no_media:
+        with Progress(
+            SpinnerColumn(),
+            TextColumn("[progress.description]{task.description}"),
+            BarColumn(),
+            MofNCompleteColumn(),
+            TimeElapsedColumn(),
+            console=console,
+        ) as progress:
+            task = progress.add_task("Building zip", total=_count_media_refs(backup))
+            data = export_json(
+                backup, files_dir, on_media=lambda: progress.advance(task)
+            )
+    else:
+        with console.status("Building zip…"):
+            data = export_json(backup)
+
+    out_path.write_bytes(data)
     console.print(
-        f"[green]✓[/] Wrote {len(backup.chats)} chats to [bold]{manifest.parent}[/] "
-        f"(see {manifest.name})"
+        f"[green]✓[/] Wrote {len(data) / 1e6:.1f} MB zip to [bold]{out_path}[/]"
     )
 
 
@@ -243,7 +260,7 @@ def main(argv: list[str] | None = None) -> None:
     sub = parser.add_subparsers(dest="cmd", required=True)
     for name, handler, help_ in (
         ("decrypt", _cmd_decrypt, "decrypt to the raw plaintext frame stream (debug)"),
-        ("json", _cmd_json, "export chats as JSON (manifest + one file per chat)"),
+        ("json", _cmd_json, "export chats + media as a self-contained zip (backup.zip)"),
         ("html", _cmd_html, "render a browsable HTML archive"),
         ("verify", _cmd_verify, "diagnose whether the AEP is correct for the archive"),
         (
@@ -267,7 +284,7 @@ def main(argv: list[str] | None = None) -> None:
         p.add_argument(
             "-o",
             "--output",
-            help="output file (decrypt) or directory (json/html/change-key)",
+            help="output path: file for decrypt/json, directory for html/change-key",
         )
         p.set_defaults(func=handler)
 

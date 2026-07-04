@@ -1,8 +1,10 @@
 """Model indexing + JSON export over synthetic frames (no crypto needed)."""
 
+import io
 import json
+import zipfile
 
-from signal_backup_decrypt.json_export import export_json
+from signal_backup_decrypt.json import export_json
 from signal_backup_decrypt.model import Backup
 from signal_backup_decrypt.proto import backup_pb2
 
@@ -30,20 +32,27 @@ def _frames():
     return [f_self, f_alice, f_chat, f_msg]
 
 
-def test_json_export(tmp_path):
+def test_json_export():
     info = backup_pb2.BackupInfo(version=1, backupTimeMs=1700000000000)
     backup = Backup.from_frames(info, _frames())
 
     assert backup.self_id == 1
     assert backup.display_name(2) == "Alice"
 
-    manifest_path = export_json(backup, tmp_path)
-    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-    assert manifest["counts"] == {"recipients": 2, "chats": 1, "messages": 1}
+    data = export_json(backup)
+    assert data[:2] == b"PK"  # zip magic
 
-    chat = json.loads((tmp_path / "chat-10.json").read_text(encoding="utf-8"))
-    assert chat["name"] == "Alice"
-    msg = chat["messages"][0]
-    assert msg["authorName"] == "Alice"
-    assert msg["direction"] == "incoming"
-    assert msg["standardMessage"]["text"]["body"] == "hello there"
+    with zipfile.ZipFile(io.BytesIO(data)) as zf:
+        names = zf.namelist()
+        assert "manifest.json" in names
+        assert "chat-10.json" in names
+
+        manifest = json.loads(zf.read("manifest.json").decode())
+        assert manifest["counts"] == {"recipients": 2, "chats": 1, "messages": 1}
+
+        chat = json.loads(zf.read("chat-10.json").decode())
+        assert chat["name"] == "Alice"
+        msg = chat["messages"][0]
+        assert msg["authorName"] == "Alice"
+        assert msg["direction"] == "incoming"
+        assert msg["standardMessage"]["text"]["body"] == "hello there"
