@@ -5,6 +5,8 @@
 This project served as a test of capacities of LLM, namely at the time of writing, Fable.
 Thus, LLM was involved in the writing of the tool. Still, all aspects have been check by an human and the project works on real data.
 
+## Description
+
 Decrypt a **new-format ("Signal Backups" / v2)** Signal Android backup offline and export it
 as a browsable HTML archive or as JSON. This targets the format keyed off your **Account Entropy
 Pool** (recovery key) — *not* the classic 30-digit-passphrase `.backup` file.
@@ -42,8 +44,6 @@ uv run signal-backup change-key data
 ```
 
 The AEP is read from the `SIGNAL_AEP` environment variable, else a hidden interactive prompt.
-There is deliberately no command-line flag for it: a key typed as an argument would end up in
-the shell history.
 
 ## How the encryption works (findings)
 
@@ -65,8 +65,7 @@ AEP (64-char recovery key, used verbatim as HKDF IKM)
 **The recovery key (AEP)** — the canonical alphabet is digits + lowercase (`0-9a-z`) only. Signal
 *displays* it uppercased, grouped in 4s, and with two characters swapped for legibility
 (`CHARACTER_DISPLAY_MAP`: letter `O`→`#`, digit `0`→`=`). To use a pasted key you must reverse that:
-strip whitespace, map `#`→`O` and `=`→`0`, then lowercase. (This was the subtle gotcha — the swap,
-not just the case.)
+strip whitespace, map `#`→`O` and `=`→`0`, then lowercase.
 
 **Recovering the BackupId (fully offline)** — a snapshot folder holds `metadata`, `main`, `files`.
 The 36-byte `metadata` is a protobuf `{version, EncryptedBackupId{iv(12), encryptedId(16)}}`; the
@@ -88,10 +87,6 @@ into AES(32)+MAC(32), layout `IV(16) ‖ AES-256-CBC/PKCS5 ‖ HMAC-SHA256(32)` 
 
 ## Known limitations
 
-- **Only the local archive folder format is handled.** The remote (Signal-servers) backup — the
-  single-file download whose keys involve the account ACI and, for newer backups, a
-  forward-secrecy salt held in Signal's SVRB — is out of scope; those files (they start with the
-  `SBACKUP\x01` magic) are rejected. So is the classic 30-digit-passphrase `.backup` format.
 - **Media** is decrypted from the sibling `files/` directory and rendered inline
   (images/video/audio) or linked (other files); pass `--no-media` to skip.
 - **Contact and group photos are not in the backup at all** — the frames carry only an
