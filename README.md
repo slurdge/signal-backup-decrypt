@@ -90,6 +90,11 @@ into AES(32)+MAC(32), layout `IV(16) ‖ AES-256-CBC/PKCS5 ‖ HMAC-SHA256(32)` 
   `SBACKUP\x01` magic) are rejected. So is the classic 30-digit-passphrase `.backup` format.
 - **Media** is decrypted from the sibling `files/` directory and rendered inline
   (images/video/audio) or linked (other files); pass `--no-media` to skip.
+- **Contact and group photos are not in the backup at all** — the frames carry only an
+  `avatarColor` enum (plus the profile key Signal uses to refetch photos from the CDN after a
+  restore). The HTML export therefore renders the app's colored-initial avatars, using the stored
+  color or, when unset, Signal's documented fallback (`AvatarColorHash`: first byte of
+  SHA-256(contact id) modulo the palette).
 - Rich message types (payments, gift badges, polls, view-once) show as labeled placeholders. Text,
   attachments, stickers, quotes, reactions, link previews, and common system messages render.
 
@@ -97,8 +102,12 @@ into AES(32)+MAC(32), layout `IV(16) ‖ AES-256-CBC/PKCS5 ‖ HMAC-SHA256(32)` 
 
 ```bash
 uv run pytest                      # offline: KATs from libsignal + envelope round-trip
-uv run python scripts/gen_proto.py # regenerate backup_pb2.py after bumping the submodule
+uv run python scripts/gen_proto.py # regenerate backup_pb2.py(+.pyi) after bumping the submodule
 ```
+
+The generated `backup_pb2.py` is an opaque serialized descriptor; the readable versions are the
+schema itself (`vendor/libsignal/rust/message-backup/src/proto/backup.proto`) and the generated
+`backup_pb2.pyi` stub, which is what IDEs use for go-to-definition on `backup_pb2.Recipient` etc.
 
 `tests/test_keys.py` pins the whole derivation chain to libsignal's own known-answer vectors, so a
 CI-style `pytest` run tells you immediately if an upstream constant changed.

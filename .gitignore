@@ -13,4 +13,4 @@ build/
 *.backup
 frames.bin
 data/
-out/
+/out*/

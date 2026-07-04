@@ -24,6 +24,7 @@ def main() -> int:
         sys.executable, "-m", "grpc_tools.protoc",
         f"--proto_path={PROTO_SRC}",
         f"--python_out={OUT}",
+        f"--pyi_out={OUT}",  # typed stubs: readable message defs + IDE go-to-definition
         "backup.proto",
     ]
     print(" ".join(cmd))

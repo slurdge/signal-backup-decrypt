@@ -17,7 +17,7 @@
           border-bottom:1px solid var(--line); }
   .conv:hover { background:#f0f0f0; }
   .conv.active { background:#e8effe; }
-  .avatar { width:40px; height:40px; border-radius:50%; background:var(--blue); color:#fff;
+  .avatar { width:40px; height:40px; border-radius:50%;
             display:flex; align-items:center; justify-content:center; font-weight:600; flex:0 0 auto; }
   .conv .meta { overflow:hidden; }
   .conv .name { font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
@@ -53,7 +53,7 @@
   <h1>{{ chats|length }} conversations · backup {{ backup_time }}</h1>
   {% for c in chats %}
   <div class="conv" data-id="{{ c.id }}" onclick="showChat('{{ c.id }}', this)">
-    <div class="avatar">{{ c.initial }}</div>
+    <div class="avatar" style="background:{{ c.avatar_bg }};color:{{ c.avatar_fg }}">{{ c.initial }}</div>
     <div class="meta">
       <div class="name">{{ c.name }}</div>
       <div class="sub">{{ c.count }} message{{ '' if c.count == 1 else 's' }}</div>
