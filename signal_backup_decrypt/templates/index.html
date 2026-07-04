@@ -65,7 +65,7 @@
   .row.joined-prev { margin-top:2px; }
   .row.out { justify-content:flex-end; }
   .row.system { justify-content:center; }
-  .msg { display:flex; flex-direction:column; align-items:flex-start; max-width:min(66%, 480px); }
+  .msg { display:flex; flex-direction:column; align-items:flex-start; max-width:90%; }
   .row.out .msg { align-items:flex-end; }
   .bubble { max-width:100%; padding:8px 12px; border-radius:18px; word-wrap:break-word; }
   .body { white-space:pre-wrap; }  /* only real message text keeps its newlines */
@@ -91,8 +91,11 @@
   .attach-file { display:inline-block; margin:2px 0; color:inherit; }
   .quote { border-left:3px solid var(--accent); background:var(--quote-bg); border-radius:4px;
            padding:4px 8px; margin-bottom:4px; font-size:13px; opacity:.9; }
-  /* Reaction pills sit under the bubble, tucked against its bottom edge. */
+  /* Reaction pills sit under the bubble, tucked against its bottom edge on the
+     center-facing side (right of incoming bubbles, left of outgoing ones). */
   .reactions { position:relative; margin-top:-8px; padding:0 8px; z-index:1; }
+  .row.in  .reactions { align-self:flex-end; }
+  .row.out .reactions { align-self:flex-start; }
   .reactions span { display:inline-block; background:var(--pill); border:1px solid var(--line);
                     border-radius:10px; padding:1px 7px; font-size:12px; margin-right:3px;
                     cursor:default; box-shadow:0 1px 2px rgba(0,0,0,.15); }
