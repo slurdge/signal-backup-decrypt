@@ -1,8 +1,12 @@
 [project]
 name = "signal-backup-decrypt"
-version = "0.1.0"
+version = "1.0.0"
 description = "Decrypt and export Signal Android backups to HTML and JSON"
 readme = "README.md"
+license = "MIT"
+authors = [
+    {name = "slurdge"},
+]
 requires-python = ">=3.13"
 dependencies = [
     "cryptography>=41",
@@ -13,8 +17,12 @@ dependencies = [
     "typer>=0.12",
 ]
 
+[project.urls]
+Homepage = "https://github.com/slurdge/signal-backup-decrypt"
+Repository = "https://github.com/slurdge/signal-backup-decrypt"
+
 [project.scripts]
-signal-backup = "signal_backup_decrypt.cli:main"
+signal-backup-decrypt = "signal_backup_decrypt.cli:main"
 
 [build-system]
 requires = ["hatchling"]
