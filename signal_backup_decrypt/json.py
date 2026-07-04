@@ -40,11 +40,11 @@ def _add_pointer(
     on_media: Callable[[], None] | None,
 ) -> None:
     """Decrypt one FilePointer into the zip under media/; skip if already added."""
+    if on_media is not None:
+        on_media()
     loc = pointer.locatorInfo
     if not loc.localKey or loc.WhichOneof("integrityCheck") != "plaintextHash":
         return
-    if on_media is not None:
-        on_media()
     name = media_name(loc.plaintextHash, loc.localKey)
     content_type = pointer.contentType or "application/octet-stream"
     ext = mimetypes.guess_extension(content_type) or ".bin"

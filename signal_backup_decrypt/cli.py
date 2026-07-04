@@ -260,7 +260,11 @@ def main(argv: list[str] | None = None) -> None:
     sub = parser.add_subparsers(dest="cmd", required=True)
     for name, handler, help_ in (
         ("decrypt", _cmd_decrypt, "decrypt to the raw plaintext frame stream (debug)"),
-        ("json", _cmd_json, "export chats + media as a self-contained zip (backup.zip)"),
+        (
+            "json",
+            _cmd_json,
+            "export chats + media as a self-contained zip (backup.zip)",
+        ),
         ("html", _cmd_html, "render a browsable HTML archive"),
         ("verify", _cmd_verify, "diagnose whether the AEP is correct for the archive"),
         (
