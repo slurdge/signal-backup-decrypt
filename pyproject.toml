@@ -8,6 +8,7 @@ dependencies = [
     "cryptography>=41",
     "protobuf>=4",
     "jinja2>=3",
+    "markupsafe>=2",
 ]
 
 [project.scripts]

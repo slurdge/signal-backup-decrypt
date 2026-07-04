@@ -87,8 +87,24 @@
   .time.block { display:block; text-align:right; margin-top:3px; }
   .row.out .time { color:var(--meta-out); }
   .note { font-style:italic; opacity:.85; margin-top:2px; }
+  .bubble a { color:inherit; }
   .attach { display:block; max-width:260px; max-height:320px; border-radius:12px; margin:2px 0; }
+  img.attach { cursor:zoom-in; }
   .attach-file { display:inline-block; margin:2px 0; color:inherit; }
+  .vidwrap { position:relative; display:block; }
+  .vidwrap .expand { position:absolute; top:8px; right:8px; border:0; border-radius:8px;
+                     background:rgba(0,0,0,.55); color:#fff; cursor:pointer; font-size:14px;
+                     line-height:1; padding:5px 7px; }
+  /* Click-to-load YouTube embed: no network request until played. */
+  .yt { width:320px; max-width:100%; aspect-ratio:16/9; background:#000; color:#fff;
+        border-radius:12px; display:flex; align-items:center; justify-content:center;
+        gap:8px; cursor:pointer; font-size:13px; margin:2px 0; user-select:none; }
+  .yt iframe { width:100%; height:100%; border:0; border-radius:12px; }
+  #lightbox { position:fixed; inset:0; background:rgba(0,0,0,.92); display:none;
+              align-items:center; justify-content:center; z-index:100; cursor:zoom-out; }
+  #lightbox.open { display:flex; }
+  #lightbox img, #lightbox video { max-width:94vw; max-height:94vh; border-radius:4px;
+                                   cursor:default; }
   .quote { border-left:3px solid var(--accent); background:var(--quote-bg); border-radius:4px;
            padding:4px 8px; margin-bottom:4px; font-size:13px; opacity:.9; }
   /* Reaction pills sit under the bubble, tucked against its bottom edge on the
@@ -139,12 +155,13 @@
           {% if m.show_author %}<div class="author" style="--author-l:{{ m.author_fg }};--author-d:{{ m.author_bg }}">{{ m.author }}</div>{% endif %}
           {% if m.quote %}<div class="quote"><b>{{ m.quote.author }}</b><br>{{ m.quote.text }}</div>{% endif %}
           {% for md in m.media %}
-            {% if md.kind == 'image' %}<a href="{{ md.src }}" target="_blank"><img class="attach" src="{{ md.src }}" loading="lazy" alt="{{ md.fileName }}"></a>
-            {% elif md.kind == 'video' %}<video class="attach" src="{{ md.src }}" controls preload="none"></video>
+            {% if md.kind == 'image' %}<img class="attach" src="{{ md.src }}" loading="lazy" alt="{{ md.fileName }}" onclick="openLightbox(this)">
+            {% elif md.kind == 'video' %}<div class="vidwrap"><video class="attach" src="{{ md.src }}" controls preload="none"></video><button class="expand" onclick="openLightbox(this.previousElementSibling)" title="Expand">⛶</button></div>
             {% elif md.kind == 'audio' %}<audio src="{{ md.src }}" controls preload="none"></audio>
             {% else %}<a class="attach-file" href="{{ md.src }}" download="{{ md.fileName }}">📎 {{ md.fileName }}</a>{% endif %}
           {% endfor %}
           {% for n in m.notes %}<div class="note">{{ n }}</div>{% endfor %}
+          {% for yt in m.youtube %}<div class="yt" data-id="{{ yt }}" onclick="loadYt(this)">▶ Play YouTube video</div>{% endfor %}
           {% if m.body %}<div class="body">{{ m.body }}{% if m.show_time %}<span class="time" title="{{ m.time_full }}">{{ m.time }}</span>{% endif %}</div>
           {% elif m.show_time %}<div class="time block" title="{{ m.time_full }}">{{ m.time }}</div>{% endif %}
         </div>
@@ -158,7 +175,40 @@
     {% endfor %}
   </div>
 </section>
+<div id="lightbox" onclick="closeLightbox(event)"><div id="lightbox-content"></div></div>
 <script>
+  function openLightbox(el) {
+    const c = document.getElementById('lightbox-content');
+    c.innerHTML = '';
+    let node;
+    if (el.tagName === 'IMG') {
+      node = document.createElement('img');
+      node.src = el.src;
+    } else {
+      el.pause && el.pause();  /* stop the inline player before opening the big one */
+      node = document.createElement('video');
+      node.src = el.src;
+      node.controls = true;
+      node.autoplay = true;
+    }
+    c.appendChild(node);
+    document.getElementById('lightbox').classList.add('open');
+  }
+  function closeLightbox(ev) {
+    if (ev && (ev.target.tagName === 'IMG' || ev.target.tagName === 'VIDEO')) return;
+    document.getElementById('lightbox').classList.remove('open');
+    document.getElementById('lightbox-content').innerHTML = '';  /* stops any playing video */
+  }
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') closeLightbox(); });
+  function loadYt(el) {
+    const f = document.createElement('iframe');
+    f.src = 'https://www.youtube-nocookie.com/embed/' + el.dataset.id + '?autoplay=1';
+    f.allow = 'autoplay; fullscreen; encrypted-media; picture-in-picture';
+    f.allowFullscreen = true;
+    el.replaceChildren(f);
+    el.onclick = null;
+    el.style.cursor = 'default';
+  }
   function toggleTheme() {
     const next = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
     document.documentElement.dataset.theme = next;

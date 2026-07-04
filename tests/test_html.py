@@ -83,6 +83,29 @@ def test_reactions_grouped_with_hover_names(tmp_path):
     assert "Note to Self" not in html                      # owner reads "You", not the chat title
 
 
+def test_links_and_youtube(tmp_path):
+    frames = _frames() + [
+        _msg(10, 2, 1700000100000,
+             "see https://example.com/a. then https://youtu.be/dQw4w9WgXcQ ok"),
+    ]
+    backup = Backup.from_frames(backup_pb2.BackupInfo(version=1), frames)
+    html = export_html(backup, tmp_path).read_text(encoding="utf-8")
+
+    # Bare URLs become links; trailing sentence punctuation stays outside the href.
+    assert ('<a href="https://example.com/a" target="_blank" rel="noopener">'
+            "https://example.com/a</a>.") in html
+    assert 'data-id="dQw4w9WgXcQ"' in html  # click-to-load YouTube placeholder
+    assert 'id="lightbox"' in html
+
+
+def test_linkify_escapes_html(tmp_path):
+    frames = _frames() + [_msg(10, 2, 1700000100000, "<b>bold?</b> https://e.com/?a=1&b=2")]
+    backup = Backup.from_frames(backup_pb2.BackupInfo(version=1), frames)
+    html = export_html(backup, tmp_path).read_text(encoding="utf-8")
+    assert "<b>bold?</b>" not in html  # message text is still escaped
+    assert 'href="https://e.com/?a=1&amp;b=2"' in html
+
+
 def test_date_headers_one_per_day(tmp_path):
     t0 = 1700000000000  # 2023-11-14 UTC (local date may differ; only counts matter)
     frames = _frames() + [

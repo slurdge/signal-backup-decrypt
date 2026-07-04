@@ -326,6 +326,7 @@ source = { editable = "." }
 dependencies = [
     { name = "cryptography" },
     { name = "jinja2" },
+    { name = "markupsafe" },
     { name = "protobuf" },
 ]
 
@@ -339,6 +340,7 @@ dev = [
 requires-dist = [
     { name = "cryptography", specifier = ">=41" },
     { name = "jinja2", specifier = ">=3" },
+    { name = "markupsafe", specifier = ">=2" },
     { name = "protobuf", specifier = ">=4" },
 ]
 

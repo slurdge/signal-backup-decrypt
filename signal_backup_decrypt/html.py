@@ -9,10 +9,12 @@ profile CDN after restore), so avatars are the app's colored-initial style.
 from __future__ import annotations
 
 import hashlib
+import re
 from datetime import datetime
 from pathlib import Path
 
 from jinja2 import Environment, PackageLoader, select_autoescape
+from markupsafe import Markup, escape
 
 from .model import Backup
 from .proto import backup_pb2
@@ -69,6 +71,30 @@ def _avatar_colors(r: backup_pb2.Recipient | None) -> tuple[str, str]:
     if code is None and data:
         code = _AVATAR_FALLBACK_ORDER[hashlib.sha256(data).digest()[0] % len(_AVATAR_FALLBACK_ORDER)]
     return _AVATAR_COLORS.get(code, _AVATAR_COLORS["A100"])
+
+
+_URL_RE = re.compile(r"https?://[^\s<>\"']+")
+_YT_RE = re.compile(
+    r"(?:youtube\.com/(?:watch\?[^\s]*?v=|shorts/|live/|embed/)|youtu\.be/)([A-Za-z0-9_-]{11})"
+)
+
+
+def _linkify(text: str) -> Markup:
+    """Escape text and turn bare http(s) URLs into links (Markup survives autoescape)."""
+    parts: list[str] = []
+    pos = 0
+    for m in _URL_RE.finditer(text):
+        url = m.group(0).rstrip(".,;:!?")  # trailing sentence punctuation isn't part of the URL
+        parts.append(str(escape(text[pos : m.start()])))
+        parts.append(f'<a href="{escape(url)}" target="_blank" rel="noopener">{escape(url)}</a>')
+        pos = m.start() + len(url)
+    parts.append(str(escape(text[pos:])))
+    return Markup("".join(parts))
+
+
+def _youtube_ids(text: str) -> list[str]:
+    """Video ids of any YouTube links in the text, deduplicated, in order."""
+    return list(dict.fromkeys(_YT_RE.findall(text)))
 
 
 def _fmt_time(ms: int) -> str:
@@ -156,6 +182,7 @@ def _view(backup: Backup, item: backup_pb2.ChatItem, media=None) -> dict:
         "body": "",
         "notes": [],
         "media": [],
+        "youtube": [],
         "reactions": [],
         "quote": None,
         "system": None,
@@ -164,11 +191,13 @@ def _view(backup: Backup, item: backup_pb2.ChatItem, media=None) -> dict:
     if kind == "standardMessage":
         sm = item.standardMessage
         if sm.HasField("text"):
-            v["body"] = sm.text.body
+            v["body"] = _linkify(sm.text.body)
+            v["youtube"] = _youtube_ids(sm.text.body)
         for a in sm.attachments:
             _attach(v, media, a.pointer, _attachment_label(a))
         for lp in sm.linkPreview:
-            v["notes"].append(f"🔗 {lp.url}")
+            v["notes"].append(_linkify(f"🔗 {lp.url}"))
+            v["youtube"] += [i for i in _youtube_ids(lp.url) if i not in v["youtube"]]
             if lp.HasField("image"):
                 _attach(v, media, lp.image, "")
         if sm.HasField("quote"):
