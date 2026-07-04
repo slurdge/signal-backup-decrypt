@@ -1,0 +1,3 @@
+[submodule "vendor/libsignal"]
+	path = vendor/libsignal
+	url = https://github.com/signalapp/libsignal.git
