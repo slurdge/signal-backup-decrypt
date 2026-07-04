@@ -72,9 +72,16 @@ def _avatar_colors(r: backup_pb2.Recipient | None) -> tuple[str, str]:
 
 
 def _fmt_time(ms: int) -> str:
+    """Short in-bubble time, like the app; the date lives in the day separators."""
     if not ms:
         return ""
-    return datetime.fromtimestamp(ms / 1000).strftime("%Y-%m-%d %H:%M")
+    return datetime.fromtimestamp(ms / 1000).strftime("%H:%M")
+
+
+def _fmt_time_full(ms: int) -> str:
+    if not ms:
+        return ""
+    return datetime.fromtimestamp(ms / 1000).strftime("%Y-%m-%d %H:%M:%S")
 
 
 def _attachment_label(att: backup_pb2.MessageAttachment) -> str:
@@ -93,8 +100,17 @@ def _attachment_label(att: backup_pb2.MessageAttachment) -> str:
     return f"{icon} {p.fileName or ct or 'attachment'}"
 
 
-def _reaction(backup: Backup, r: backup_pb2.Reaction) -> str:
-    return f"{r.emoji} {backup.display_name(r.authorId)}"
+def _reactions(backup: Backup, reactions) -> list[dict]:
+    """Collapse reactions by emoji: [{emoji, count, names}], most-used first (like the app)."""
+    by_emoji: dict[str, list[str]] = {}
+    for r in reactions:
+        by_emoji.setdefault(r.emoji, []).append(backup.author_name(r.authorId))
+    grouped = [
+        {"emoji": emoji, "count": len(names), "names": ", ".join(names)}
+        for emoji, names in by_emoji.items()
+    ]
+    grouped.sort(key=lambda g: -g["count"])
+    return grouped
 
 
 def _update_label(item: backup_pb2.ChatItem) -> str:
@@ -127,7 +143,7 @@ def _view(backup: Backup, item: backup_pb2.ChatItem, media=None) -> dict:
     author_bg, author_fg = _avatar_colors(backup.recipients.get(item.authorId))
     v = {
         "css": {"incoming": "in", "outgoing": "out"}.get(direction, "system"),
-        "author": backup.display_name(item.authorId),
+        "author": backup.author_name(item.authorId),
         "author_fg": author_fg,  # author-name color on light theme
         "author_bg": author_bg,  # the pastel variant reads better on dark bubbles
         "show_author": False,    # set per-chat: group chats, first bubble of a run
@@ -135,6 +151,8 @@ def _view(backup: Backup, item: backup_pb2.ChatItem, media=None) -> dict:
         "joined_prev": False,
         "joined_next": False,
         "time": _fmt_time(item.dateSent),
+        "time_full": _fmt_time_full(item.dateSent),
+        "show_time": True,  # cleared for bubbles continued by the same sender
         "body": "",
         "notes": [],
         "media": [],
@@ -156,19 +174,19 @@ def _view(backup: Backup, item: backup_pb2.ChatItem, media=None) -> dict:
         if sm.HasField("quote"):
             q = sm.quote
             v["quote"] = {
-                "author": backup.display_name(q.authorId),
+                "author": backup.author_name(q.authorId),
                 "text": q.text.body if q.HasField("text") else "",
             }
-        v["reactions"] = [_reaction(backup, r) for r in sm.reactions]
+        v["reactions"] = _reactions(backup, sm.reactions)
     elif kind == "stickerMessage":
         st = item.stickerMessage.sticker
         _attach(v, media, st.data, f"[Sticker {st.emoji}]".replace(" ]", "]"))
-        v["reactions"] = [_reaction(backup, r) for r in item.stickerMessage.reactions]
+        v["reactions"] = _reactions(backup, item.stickerMessage.reactions)
     elif kind == "remoteDeletedMessage" or kind == "adminDeletedMessage":
         v["notes"] = ["🗑 This message was deleted"]
     elif kind == "contactMessage":
         v["notes"] = ["[Shared contact]"]
-        v["reactions"] = [_reaction(backup, r) for r in item.contactMessage.reactions]
+        v["reactions"] = _reactions(backup, item.contactMessage.reactions)
     elif kind == "viewOnceMessage":
         v["notes"] = ["[View-once media]"]
     elif kind == "paymentNotification":
@@ -204,6 +222,19 @@ def _mark_clusters(views: list[dict]) -> None:
             cur["joined_prev"] = True
 
 
+def _with_date_headers(views: list[dict]) -> list[dict]:
+    """Interleave centered day separators (like the app's timeline date headers)."""
+    out: list[dict] = []
+    last = None
+    for m in views:
+        day = datetime.fromtimestamp(m["ts"] / 1000).date() if m["ts"] else None
+        if day is not None and day != last:
+            out.append({"date_header": f"{day.strftime('%B')} {day.day}, {day.year}"})
+            last = day
+        out.append(m)
+    return out
+
+
 def export_html(backup: Backup, out_dir: Path, media=None) -> Path:
     out_dir.mkdir(parents=True, exist_ok=True)
     env = Environment(
@@ -220,8 +251,10 @@ def export_html(backup: Backup, out_dir: Path, media=None) -> Path:
         is_group = recipient is not None and recipient.WhichOneof("destination") == "group"
         views = [_view(backup, it, media) for it in items]
         _mark_clusters(views)
-        for m in views:  # author names: only in group chats, only atop a run (like the app)
+        for m in views:  # author atop a run (group chats), time only at the end of a run
             m["show_author"] = is_group and m["css"] == "in" and not m["joined_prev"]
+            m["show_time"] = not m["joined_next"]
+        views = _with_date_headers(views)
         chats.append(
             {
                 "id": chat.id,

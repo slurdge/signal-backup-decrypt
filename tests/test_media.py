@@ -55,3 +55,27 @@ def test_media_round_trip(tmp_path):
 def test_media_absent_when_no_local_key(tmp_path):
     ex = MediaExtractor(tmp_path / "files", tmp_path / "out")
     assert ex.extract(backup_pb2.FilePointer(contentType="image/jpeg")) is None
+
+
+def test_media_reuses_existing_output(tmp_path):
+    local_key = os.urandom(64)
+    plaintext_hash = hashlib.sha256(CONTENT).digest()
+    name = media_name(plaintext_hash, local_key)
+
+    files_dir = tmp_path / "files"
+    (files_dir / name[:2]).mkdir(parents=True)
+    (files_dir / name[:2] / name).write_bytes(_encrypt(local_key, CONTENT))
+    pointer = _pointer(local_key, plaintext_hash, len(CONTENT))
+    out_dir = tmp_path / "out" / "media"
+
+    # A fresh extractor (new run) finds the previously exported file and skips decryption.
+    MediaExtractor(files_dir, out_dir).extract(pointer)
+    ex = MediaExtractor(files_dir, out_dir)
+    result = ex.extract(pointer)
+    assert result is not None and result["kind"] == "image"
+    assert (ex.decrypted, ex.reused) == (0, 1)
+
+    # --force-files re-decrypts even though the output exists.
+    ex_forced = MediaExtractor(files_dir, out_dir, force=True)
+    ex_forced.extract(pointer)
+    assert (ex_forced.decrypted, ex_forced.reused) == (1, 0)

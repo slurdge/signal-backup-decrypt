@@ -75,10 +75,11 @@ def _cmd_html(args):
     out_dir = Path(args.output or "out")
     media = None
     if files_dir and not args.no_media:
-        media = MediaExtractor(files_dir, out_dir / "media")
+        media = MediaExtractor(files_dir, out_dir / "media", force=args.force_files)
     index = export_html(backup, out_dir, media)
     if media:
-        print(f"Media: {media.decrypted} decrypted, {media.missing} missing, {media.failed} failed")
+        print(f"Media: {media.decrypted} decrypted, {media.reused} reused, "
+              f"{media.missing} missing, {media.failed} failed")
     print(f"Wrote HTML to {index}")
 
 
@@ -154,6 +155,8 @@ def main(argv: list[str] | None = None) -> None:
         p.add_argument("source", help="local archive folder (the snapshot dir or its parent)")
         p.add_argument("--aep", help="Account Entropy Pool (else $SIGNAL_AEP or prompt)")
         p.add_argument("--no-media", action="store_true", help="skip decrypting attachments (html)")
+        p.add_argument("--force-files", action="store_true",
+                       help="re-decrypt media even if the output file already exists (html)")
         p.add_argument("-o", "--output",
                        help="output file (decrypt) or directory (json/html/change-key)")
         p.set_defaults(func=handler)

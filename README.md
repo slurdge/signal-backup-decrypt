@@ -29,6 +29,9 @@ uv sync
 uv run signal-backup html data -o out
 uv run signal-backup json data -o out
 
+# Re-runs reuse media already in out/media (big time saver); --force-files re-decrypts:
+uv run signal-backup html data -o out --force-files
+
 # Raw decrypted protobuf frame stream (debugging):
 uv run signal-backup decrypt data -o frames.bin
 

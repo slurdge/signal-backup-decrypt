@@ -11,27 +11,34 @@
     (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
 </script>
 <style>
+  /* Palette and metrics transcribed from Signal Desktop (stylesheets/_variables.scss,
+     _modules.scss): ultramarine #2c6bed, gray scale, 18px bubbles with 4px collapsed
+     corners, 8x12px bubble padding, Inter font stack. */
   :root {
-    --accent:#2c6bed;
-    --bg:#ffffff; --bg-side:#fafafa; --bg-hover:#ececec; --bg-active:#e8effe;
-    --text:#111111; --muted:#6b7280; --line:#e4e4e7;
-    --bubble-in:#e9e9e9; --text-in:#111111;
-    --bubble-out:var(--accent); --text-out:#ffffff; --time-out:#cfdffe;
+    --accent:#2c6bed;                             /* $color-ultramarine */
+    --bg:#ffffff; --bg-side:#ffffff; --bg-hover:#f6f6f6; --bg-active:#e9e9e9;
+    --text:#1b1b1b; --muted:#5e5e5e; --line:#dedede;
+    --bubble-in:#e9e9e9; --text-in:#1b1b1b;       /* gray-05 on gray-90 */
+    --bubble-out:var(--accent); --text-out:#ffffff;
+    --meta:#5e5e5e; --meta-out:rgba(255,255,255,.8);
     --pill:#ffffff; --quote-bg:rgba(0,0,0,.05);
   }
   :root[data-theme="dark"] {
-    --bg:#151617; --bg-side:#1c1d1f; --bg-hover:#26282b; --bg-active:#2f3238;
-    --text:#eeeeee; --muted:#9ca3af; --line:#2c2d31;
-    --bubble-in:#2f3033; --text-in:#eeeeee;
-    --bubble-out:var(--accent); --text-out:#ffffff; --time-out:#cfdffe;
-    --pill:#1c1d1f; --quote-bg:rgba(255,255,255,.07);
+    --bg:#121212; --bg-side:#1b1b1b; --bg-hover:#2e2e2e; --bg-active:#4a4a4a;
+    --text:#e9e9e9; --muted:#b9b9b9; --line:#2e2e2e;
+    --bubble-in:#3b3b3b; --text-in:#e9e9e9;       /* gray-75 on gray-05 */
+    --bubble-out:var(--accent); --text-out:#e9e9e9;
+    --meta:#b9b9b9; --meta-out:rgba(255,255,255,.8);
+    --pill:#1b1b1b; --quote-bg:rgba(255,255,255,.07);
   }
   * { box-sizing: border-box; }
-  body { margin:0; font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
-         color:var(--text); background:var(--bg); height:100vh; display:flex; }
+  body { margin:0; color:var(--text); background:var(--bg); height:100vh; display:flex;
+         font-family:Inter,-apple-system,system-ui,'Segoe UI','Noto Sans','Helvetica Neue',
+                     Helvetica,Arial,sans-serif;
+         font-size:14px; line-height:20px; }
   #sidebar { width:320px; min-width:260px; border-right:1px solid var(--line);
              overflow-y:auto; background:var(--bg-side); }
-  #sidebar h1 { font-size:15px; margin:0; padding:14px 16px; border-bottom:1px solid var(--line);
+  #sidebar h1 { font-size:14px; margin:0; padding:14px 16px; border-bottom:1px solid var(--line);
                 color:var(--muted); font-weight:600; display:flex; align-items:center; gap:8px; }
   #sidebar h1 span { flex:1; }
   #themeBtn { border:1px solid var(--line); background:var(--bg); color:var(--text);
@@ -45,36 +52,50 @@
   .conv .name { font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   .conv .sub { font-size:12px; color:var(--muted); }
   #main { flex:1; display:flex; flex-direction:column; min-width:0; }
-  #main header { padding:14px 20px; border-bottom:1px solid var(--line); font-weight:600; }
-  #thread { flex:1; overflow-y:auto; padding:16px 20px; background:var(--bg); }
+  #main header { padding:8px 20px; border-bottom:1px solid var(--line); font-weight:600;
+                 display:flex; align-items:center; gap:10px; min-height:53px; }
+  #main header .avatar { width:32px; height:32px; font-size:13px; }
+  #thread { flex:1; overflow-y:auto; padding:8px 20px 16px; background:var(--bg); }
   .chat { display:none; }
   .chat.active { display:block; }
-  .row { display:flex; margin-top:10px; }
-  .row.joined-prev { margin-top:2px; }  /* same sender continues: tighten into a block */
+  .date-header { display:flex; justify-content:center; padding:20px 0 8px;
+                 font-size:13px; font-weight:500; color:var(--muted); user-select:none; }
+  /* Desktop: 6px margins normally, 1px when collapsed into a same-sender run. */
+  .row { display:flex; margin-top:12px; }
+  .row.joined-prev { margin-top:2px; }
   .row.out { justify-content:flex-end; }
   .row.system { justify-content:center; }
-  .bubble { max-width:70%; padding:7px 12px; border-radius:18px; word-wrap:break-word; }
+  .msg { display:flex; flex-direction:column; align-items:flex-start; max-width:min(66%, 480px); }
+  .row.out .msg { align-items:flex-end; }
+  .bubble { max-width:100%; padding:8px 12px; border-radius:18px; word-wrap:break-word; }
   .body { white-space:pre-wrap; }  /* only real message text keeps its newlines */
   .row.in  .bubble { background:var(--bubble-in);  color:var(--text-in); }
   .row.out .bubble { background:var(--bubble-out); color:var(--text-out); }
-  /* Square the corners on the outer edge inside a run (top/bottom of the block stay round). */
-  .row.in.joined-prev  .bubble { border-top-left-radius:5px; }
-  .row.in.joined-next  .bubble { border-bottom-left-radius:5px; }
-  .row.out.joined-prev .bubble { border-top-right-radius:5px; }
-  .row.out.joined-next .bubble { border-bottom-right-radius:5px; }
+  /* Square the corners on the outer edge inside a run ($collapsed-border-radius: 4px). */
+  .row.in.joined-prev  .bubble { border-top-left-radius:4px; }
+  .row.in.joined-next  .bubble { border-bottom-left-radius:4px; }
+  .row.out.joined-prev .bubble { border-top-right-radius:4px; }
+  .row.out.joined-next .bubble { border-bottom-right-radius:4px; }
   .row.system .note { color:var(--muted); font-size:12px; text-align:center; margin:8px 0; }
-  .author { font-size:12px; font-weight:600; margin-bottom:2px; color:var(--author-l, var(--accent)); }
+  .author { font-size:13px; font-weight:600; margin-bottom:3px; overflow:hidden;
+            text-overflow:ellipsis; color:var(--author-l, var(--accent)); }
   :root[data-theme="dark"] .author { color:var(--author-d, var(--accent)); }
-  .time { font-size:11px; color:var(--muted); margin-top:3px; text-align:right; }
-  .row.out .time { color:var(--time-out); }
+  /* module-message__metadata: caption size; floated so it rides the last text line
+     (slightly lower), wrapping to its own right-aligned line when there's no room. */
+  .time { font-size:11px; line-height:14px; color:var(--meta); user-select:none; }
+  .body .time { float:right; margin:9px 0 0 12px; }
+  .time.block { display:block; text-align:right; margin-top:3px; }
+  .row.out .time { color:var(--meta-out); }
   .note { font-style:italic; opacity:.85; margin-top:2px; }
   .attach { display:block; max-width:260px; max-height:320px; border-radius:12px; margin:2px 0; }
   .attach-file { display:inline-block; margin:2px 0; color:inherit; }
   .quote { border-left:3px solid var(--accent); background:var(--quote-bg); border-radius:4px;
            padding:4px 8px; margin-bottom:4px; font-size:13px; opacity:.9; }
-  .reactions { margin-top:3px; }
+  /* Reaction pills sit under the bubble, tucked against its bottom edge. */
+  .reactions { position:relative; margin-top:-8px; padding:0 8px; z-index:1; }
   .reactions span { display:inline-block; background:var(--pill); border:1px solid var(--line);
-                    border-radius:10px; padding:0 6px; font-size:12px; margin-right:3px; }
+                    border-radius:10px; padding:1px 7px; font-size:12px; margin-right:3px;
+                    cursor:default; box-shadow:0 1px 2px rgba(0,0,0,.15); }
   .empty { color:var(--muted); padding:40px; text-align:center; }
 </style>
 </head>
@@ -93,16 +114,24 @@
   {% endfor %}
 </nav>
 <section id="main">
-  <header id="title">Select a conversation</header>
+  <header>
+    <div class="avatar" id="title-avatar" style="display:none"></div>
+    <span id="title">Select a conversation</span>
+  </header>
   <div id="thread">
     {% for c in chats %}
-    <div class="chat" id="chat-{{ c.id }}" data-name="{{ c.name }}">
+    <div class="chat" id="chat-{{ c.id }}" data-name="{{ c.name }}"
+         data-initial="{{ c.initial }}" data-bg="{{ c.avatar_bg }}" data-fg="{{ c.avatar_fg }}">
       {% if not c.messages %}<div class="empty">No messages.</div>{% endif %}
       {% for m in c.messages %}
+      {% if m.date_header %}
+      <div class="date-header">{{ m.date_header }}</div>
+      {% else %}
       <div class="row {{ m.css }}{% if m.joined_prev %} joined-prev{% endif %}{% if m.joined_next %} joined-next{% endif %}">
         {% if m.system %}
           <div class="note">— {{ m.system }} —</div>
         {% else %}
+        <div class="msg">
         <div class="bubble">
           {% if m.show_author %}<div class="author" style="--author-l:{{ m.author_fg }};--author-d:{{ m.author_bg }}">{{ m.author }}</div>{% endif %}
           {% if m.quote %}<div class="quote"><b>{{ m.quote.author }}</b><br>{{ m.quote.text }}</div>{% endif %}
@@ -112,13 +141,15 @@
             {% elif md.kind == 'audio' %}<audio src="{{ md.src }}" controls preload="none"></audio>
             {% else %}<a class="attach-file" href="{{ md.src }}" download="{{ md.fileName }}">📎 {{ md.fileName }}</a>{% endif %}
           {% endfor %}
-          {% if m.body %}<div class="body">{{ m.body }}</div>{% endif %}
           {% for n in m.notes %}<div class="note">{{ n }}</div>{% endfor %}
-          {% if m.reactions %}<div class="reactions">{% for r in m.reactions %}<span>{{ r }}</span>{% endfor %}</div>{% endif %}
-          <div class="time">{{ m.time }}</div>
+          {% if m.body %}<div class="body">{{ m.body }}{% if m.show_time %}<span class="time" title="{{ m.time_full }}">{{ m.time }}</span>{% endif %}</div>
+          {% elif m.show_time %}<div class="time block" title="{{ m.time_full }}">{{ m.time }}</div>{% endif %}
+        </div>
+        {% if m.reactions %}<div class="reactions">{% for r in m.reactions %}<span title="{{ r.names }}">{{ r.emoji }}{% if r.count > 1 %} {{ r.count }}{% endif %}</span>{% endfor %}</div>{% endif %}
         </div>
         {% endif %}
       </div>
+      {% endif %}
       {% endfor %}
     </div>
     {% endfor %}
@@ -137,6 +168,11 @@
     chat.classList.add('active');
     if (el) el.classList.add('active');
     document.getElementById('title').textContent = chat.dataset.name;
+    const av = document.getElementById('title-avatar');
+    av.style.display = 'flex';
+    av.style.background = chat.dataset.bg;
+    av.style.color = chat.dataset.fg;
+    av.textContent = chat.dataset.initial;
     const thread = document.getElementById('thread');
     thread.scrollTop = thread.scrollHeight;  /* jump to the latest message */
   }

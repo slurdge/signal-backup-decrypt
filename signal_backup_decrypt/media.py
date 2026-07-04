@@ -50,13 +50,20 @@ def _decrypt(blob: bytes, local_key: bytes, size: int) -> bytes:
 
 
 class MediaExtractor:
-    """Locates, decrypts, and writes out attachment media, caching by on-disk name."""
+    """Locates, decrypts, and writes out attachment media, caching by on-disk name.
 
-    def __init__(self, files_dir: Path, out_dir: Path):
+    Files already present in out_dir are reused instead of re-decrypted (the output
+    name is derived from the content-addressed media name, so an existing file is
+    guaranteed to be the same content) unless `force` is set.
+    """
+
+    def __init__(self, files_dir: Path, out_dir: Path, force: bool = False):
         self.files_dir = files_dir
         self.out_dir = out_dir
+        self.force = force
         self._cache: dict[str, dict | None] = {}
         self.decrypted = 0
+        self.reused = 0
         self.missing = 0
         self.failed = 0
 
@@ -74,6 +81,19 @@ class MediaExtractor:
         return result
 
     def _extract(self, name: str, loc, pointer) -> dict | None:
+        content_type = pointer.contentType or "application/octet-stream"
+        ext = mimetypes.guess_extension(content_type) or ".bin"
+        out_name = name[:16] + ext
+        result = {
+            "src": f"{self.out_dir.name}/{out_name}",
+            "kind": _kind(content_type),
+            "contentType": content_type,
+            "fileName": pointer.fileName or out_name,
+        }
+        if not self.force and (self.out_dir / out_name).is_file():
+            self.reused += 1
+            return result
+
         disk = self.files_dir / name[:2] / name
         if not disk.is_file():
             self.missing += 1
@@ -84,15 +104,7 @@ class MediaExtractor:
             self.failed += 1
             return None
 
-        content_type = pointer.contentType or "application/octet-stream"
-        ext = mimetypes.guess_extension(content_type) or ".bin"
         self.out_dir.mkdir(parents=True, exist_ok=True)
-        out_name = name[:16] + ext
         (self.out_dir / out_name).write_bytes(plaintext)
         self.decrypted += 1
-        return {
-            "src": f"{self.out_dir.name}/{out_name}",
-            "kind": _kind(content_type),
-            "contentType": content_type,
-            "fileName": pointer.fileName or out_name,
-        }
+        return result

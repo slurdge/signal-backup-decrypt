@@ -65,3 +65,30 @@ def test_clustering_marks_same_sender_runs(tmp_path):
     assert html.count(" joined-prev") == 2  # 2nd and 3rd bubble continue the run
     assert html.count(" joined-next") == 2  # 1st and 2nd bubble are continued
     assert 'class="row out joined' not in html  # the reply and the late message stand alone
+    # Time only on the last bubble of each run: the 3-run shows one, the two loners one each.
+    assert html.count('class="time') == 3
+
+
+def test_reactions_grouped_with_hover_names(tmp_path):
+    frames = _frames()
+    reactions = frames[-1].chatItem.standardMessage.reactions
+    reactions.add(emoji="❤", authorId=1)  # authorId 1 is the account owner ("You")
+    reactions.add(emoji="❤", authorId=2)
+    reactions.add(emoji="😀", authorId=2)
+    backup = Backup.from_frames(backup_pb2.BackupInfo(version=1), frames)
+    html = export_html(backup, tmp_path).read_text(encoding="utf-8")
+
+    assert '<span title="You, Alice">❤ 2</span>' in html  # collapsed, counted, names on hover
+    assert '<span title="Alice">😀</span>' in html         # single reaction: no counter
+    assert "Note to Self" not in html                      # owner reads "You", not the chat title
+
+
+def test_date_headers_one_per_day(tmp_path):
+    t0 = 1700000000000  # 2023-11-14 UTC (local date may differ; only counts matter)
+    frames = _frames() + [
+        _msg(10, 2, t0 + 60_000, "same day"),
+        _msg(10, 2, t0 + 3 * 24 * 3600 * 1000, "three days later"),
+    ]
+    backup = Backup.from_frames(backup_pb2.BackupInfo(version=1), frames)
+    html = export_html(backup, tmp_path).read_text(encoding="utf-8")
+    assert html.count('class="date-header"') == 2  # one per distinct day, not per message

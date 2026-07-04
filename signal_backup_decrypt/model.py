@@ -56,6 +56,15 @@ class Backup:
             return f"Unknown (#{recipient_id})"
         return _recipient_name(r)
 
+    def author_name(self, recipient_id: int) -> str:
+        """Name as a message/reaction/quote author: the owner is "You", like the app.
+
+        ("Note to Self" is only right as a chat title — see display_name.)
+        """
+        if recipient_id == self.self_id:
+            return "You"
+        return self.display_name(recipient_id)
+
 
 def _recipient_name(r: backup_pb2.Recipient) -> str:
     kind = r.WhichOneof("destination")
