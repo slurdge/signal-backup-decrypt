@@ -59,7 +59,9 @@ def _proto_fields(data: bytes) -> Iterator[tuple[int, object]]:
         elif wire == 1:  # 64-bit
             value, pos = data[pos : pos + 8], pos + 8
         else:
-            raise BackupDecryptError(f"unexpected protobuf wire type {wire} in metadata")
+            raise BackupDecryptError(
+                f"unexpected protobuf wire type {wire} in metadata"
+            )
         yield field, value
 
 
@@ -82,7 +84,9 @@ def recover_backup_id(metadata_bytes: bytes, backup_key: bytes) -> bytes:
     """Decrypt the 16-byte BackupId from the metadata (AES-256-CTR, 12-byte nonce + 32-bit counter)."""
     iv, ct = _parse_metadata(metadata_bytes)
     if len(iv) == 12:
-        counter = iv + b"\x00\x00\x00\x00"  # Aes256Ctr32: 96-bit nonce, 32-bit counter starting at 0
+        counter = (
+            iv + b"\x00\x00\x00\x00"
+        )  # Aes256Ctr32: 96-bit nonce, 32-bit counter starting at 0
     elif len(iv) == 16:
         counter = iv
     else:
@@ -96,7 +100,9 @@ def message_key_for_snapshot(snapshot_dir: Path, aep: str) -> MessageBackupKey:
     """Derive the MessageBackupKey for a local snapshot from the AEP alone (no ACI)."""
     backup_key = derive_backup_key(aep)
     backup_id = recover_backup_id((snapshot_dir / "metadata").read_bytes(), backup_key)
-    return derive_message_backup_key(backup_key, backup_id)  # local main is the legacy (no-FS) envelope
+    return derive_message_backup_key(
+        backup_key, backup_id
+    )  # local main is the legacy (no-FS) envelope
 
 
 def _varint(n: int) -> bytes:
@@ -120,7 +126,9 @@ def build_metadata(backup_id: bytes, backup_key: bytes, version: int = 1) -> byt
     """Encrypt the BackupId and serialize the metadata proto (inverse of recover_backup_id)."""
     iv = os.urandom(12)  # Aes256Ctr32: 96-bit nonce, 32-bit counter starting at 0
     metadata_key = derive_local_backup_metadata_key(backup_key)
-    encryptor = Cipher(algorithms.AES(metadata_key), modes.CTR(iv + b"\x00\x00\x00\x00")).encryptor()
+    encryptor = Cipher(
+        algorithms.AES(metadata_key), modes.CTR(iv + b"\x00\x00\x00\x00")
+    ).encryptor()
     ct = encryptor.update(backup_id) + encryptor.finalize()
     # EncryptedBackupId { 1: bytes iv, 2: bytes encryptedId }
     sub = b"\x0a" + _varint(len(iv)) + iv + b"\x12" + _varint(len(ct)) + ct
@@ -128,7 +136,9 @@ def build_metadata(backup_id: bytes, backup_key: bytes, version: int = 1) -> byt
     return b"\x08" + _varint(version) + b"\x12" + _varint(len(sub)) + sub
 
 
-def rekey_snapshot(snapshot_dir: Path, old_aep: str, new_aep: str, out_dir: Path) -> None:
+def rekey_snapshot(
+    snapshot_dir: Path, old_aep: str, new_aep: str, out_dir: Path
+) -> None:
     """Re-encrypt a snapshot's `metadata` + `main` under a new AEP, writing them to out_dir.
 
     A fresh random BackupId is generated too, severing any link to the account the old one

@@ -16,7 +16,9 @@ from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.kdf.hkdf import HKDF
 
 AEP_LEN = 64  # Account Entropy Pool: 64 ASCII chars, used verbatim as HKDF input keying material.
-_AEP_ALPHABET = "abcdefghijklmnopqrstuvwxyz0123456789"  # AccountEntropyPool: lowercase + digits
+_AEP_ALPHABET = (
+    "abcdefghijklmnopqrstuvwxyz0123456789"  # AccountEntropyPool: lowercase + digits
+)
 
 _BACKUP_KEY_INFO = b"20240801_SIGNAL_BACKUP_KEY"
 _LOCAL_METADATA_KEY_INFO = b"20241011_SIGNAL_LOCAL_BACKUP_METADATA_KEY"
@@ -48,7 +50,9 @@ def generate_aep() -> str:
 def _hkdf(ikm: bytes, length: int, info: bytes, salt: bytes | None = None) -> bytes:
     # cryptography's HKDF == RFC 5869 (extract+expand); salt=None -> HashLen zero bytes,
     # matching Rust's `Hkdf::<Sha256>::new(None, ikm)`.
-    return HKDF(algorithm=hashes.SHA256(), length=length, salt=salt, info=info).derive(ikm)
+    return HKDF(algorithm=hashes.SHA256(), length=length, salt=salt, info=info).derive(
+        ikm
+    )
 
 
 @dataclass(frozen=True)
@@ -56,14 +60,16 @@ class MessageBackupKey:
     """The two keys used by the backup envelope: HMAC-SHA256 key and AES-256 key."""
 
     hmac_key: bytes  # 32 bytes
-    aes_key: bytes   # 32 bytes
+    aes_key: bytes  # 32 bytes
 
 
 def derive_backup_key(aep: str) -> bytes:
     """AEP (recovery key) -> 32-byte BackupKey."""
     aep = normalize_aep(aep)
     if len(aep) != AEP_LEN:
-        raise ValueError(f"Account Entropy Pool must be {AEP_LEN} characters, got {len(aep)}")
+        raise ValueError(
+            f"Account Entropy Pool must be {AEP_LEN} characters, got {len(aep)}"
+        )
     try:
         ikm = aep.encode("ascii")
     except UnicodeEncodeError as e:

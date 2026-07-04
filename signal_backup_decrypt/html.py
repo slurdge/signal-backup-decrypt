@@ -65,11 +65,15 @@ def _avatar_colors(r: backup_pb2.Recipient | None) -> tuple[str, str]:
         if g.HasField("avatarColor"):
             code = backup_pb2.AvatarColor.Name(g.avatarColor)
         else:
-            data = g.masterKey  # approximation: the app hashes the zkgroup-derived group id
+            data = (
+                g.masterKey
+            )  # approximation: the app hashes the zkgroup-derived group id
     elif kind == "self" and getattr(r, "self").HasField("avatarColor"):
         code = backup_pb2.AvatarColor.Name(getattr(r, "self").avatarColor)
     if code is None and data:
-        code = _AVATAR_FALLBACK_ORDER[hashlib.sha256(data).digest()[0] % len(_AVATAR_FALLBACK_ORDER)]
+        code = _AVATAR_FALLBACK_ORDER[
+            hashlib.sha256(data).digest()[0] % len(_AVATAR_FALLBACK_ORDER)
+        ]
     return _AVATAR_COLORS.get(code, _AVATAR_COLORS["A100"])
 
 
@@ -84,9 +88,13 @@ def _linkify(text: str) -> Markup:
     parts: list[str] = []
     pos = 0
     for m in _URL_RE.finditer(text):
-        url = m.group(0).rstrip(".,;:!?")  # trailing sentence punctuation isn't part of the URL
+        url = m.group(0).rstrip(
+            ".,;:!?"
+        )  # trailing sentence punctuation isn't part of the URL
         parts.append(str(escape(text[pos : m.start()])))
-        parts.append(f'<a href="{escape(url)}" target="_blank" rel="noopener">{escape(url)}</a>')
+        parts.append(
+            f'<a href="{escape(url)}" target="_blank" rel="noopener">{escape(url)}</a>'
+        )
         pos = m.start() + len(url)
     parts.append(str(escape(text[pos:])))
     return Markup("".join(parts))
@@ -172,7 +180,7 @@ def _view(backup: Backup, item: backup_pb2.ChatItem, media=None) -> dict:
         "author": backup.author_name(item.authorId),
         "author_fg": author_fg,  # author-name color on light theme
         "author_bg": author_bg,  # the pastel variant reads better on dark bubbles
-        "show_author": False,    # set per-chat: group chats, first bubble of a run
+        "show_author": False,  # set per-chat: group chats, first bubble of a run
         "ts": item.dateSent,
         "joined_prev": False,
         "joined_next": False,
@@ -232,15 +240,20 @@ def _view(backup: Backup, item: backup_pb2.ChatItem, media=None) -> dict:
     return v
 
 
-_CLUSTER_MS = 3 * 60 * 1000  # like the app: same sender within a few minutes reads as one block
+_CLUSTER_MS = (
+    3 * 60 * 1000
+)  # like the app: same sender within a few minutes reads as one block
 
 
 def _mark_clusters(views: list[dict]) -> None:
     """Flag bubbles that continue a same-sender run, so CSS can square the inner corners."""
+
     def joined(a: dict | None, b: dict | None) -> bool:
         return (
-            a is not None and b is not None
-            and a["css"] == b["css"] and a["css"] in ("in", "out")
+            a is not None
+            and b is not None
+            and a["css"] == b["css"]
+            and a["css"] in ("in", "out")
             and a["author"] == b["author"]
             and b["ts"] - a["ts"] <= _CLUSTER_MS
         )
@@ -277,10 +290,14 @@ def export_html(backup: Backup, out_dir: Path, media=None) -> Path:
         name = backup.display_name(chat.recipientId)
         recipient = backup.recipients.get(chat.recipientId)
         avatar_bg, avatar_fg = _avatar_colors(recipient)
-        is_group = recipient is not None and recipient.WhichOneof("destination") == "group"
+        is_group = (
+            recipient is not None and recipient.WhichOneof("destination") == "group"
+        )
         views = [_view(backup, it, media) for it in items]
         _mark_clusters(views)
-        for m in views:  # author atop a run (group chats), time only at the end of a run
+        for (
+            m
+        ) in views:  # author atop a run (group chats), time only at the end of a run
             m["show_author"] = is_group and m["css"] == "in" and not m["joined_prev"]
             m["show_time"] = not m["joined_next"]
         views = _with_date_headers(views)

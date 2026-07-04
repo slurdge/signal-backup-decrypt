@@ -21,7 +21,9 @@ def main() -> int:
     OUT.mkdir(parents=True, exist_ok=True)
     (OUT / "__init__.py").touch()
     cmd = [
-        sys.executable, "-m", "grpc_tools.protoc",
+        sys.executable,
+        "-m",
+        "grpc_tools.protoc",
         f"--proto_path={PROTO_SRC}",
         f"--python_out={OUT}",
         f"--pyi_out={OUT}",  # typed stubs: readable message defs + IDE go-to-definition

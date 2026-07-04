@@ -22,7 +22,9 @@ class Backup:
     self_id: int | None
 
     @classmethod
-    def from_frames(cls, info: backup_pb2.BackupInfo, frames: Iterable[backup_pb2.Frame]) -> "Backup":
+    def from_frames(
+        cls, info: backup_pb2.BackupInfo, frames: Iterable[backup_pb2.Frame]
+    ) -> "Backup":
         recipients: dict[int, backup_pb2.Recipient] = {}
         chats: dict[int, backup_pb2.Chat] = {}
         messages: dict[int, list[backup_pb2.ChatItem]] = {}
@@ -45,9 +47,11 @@ class Backup:
 
     def chats_sorted(self) -> Iterator[backup_pb2.Chat]:
         """Chats ordered by most recent message first (empty chats last)."""
+
         def last_ts(chat: backup_pb2.Chat) -> int:
             items = self.messages.get(chat.id)
             return items[-1].dateSent if items else 0
+
         return iter(sorted(self.chats.values(), key=last_ts, reverse=True))
 
     def display_name(self, recipient_id: int) -> str:
@@ -88,7 +92,9 @@ def _recipient_name(r: backup_pb2.Recipient) -> str:
 
 def _contact_name(c: backup_pb2.Contact) -> str:
     nick = " ".join(p for p in (c.nickname.given, c.nickname.family) if p).strip()
-    profile = " ".join(p for p in (c.profileGivenName, c.profileFamilyName) if p).strip()
+    profile = " ".join(
+        p for p in (c.profileGivenName, c.profileFamilyName) if p
+    ).strip()
     system = " ".join(p for p in (c.systemGivenName, c.systemFamilyName) if p).strip()
     if nick:
         return nick

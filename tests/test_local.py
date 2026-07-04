@@ -9,7 +9,11 @@ import os
 import pytest
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 
-from signal_backup_decrypt.envelope import BackupDecryptError, decrypt_backup, encrypt_backup
+from signal_backup_decrypt.envelope import (
+    BackupDecryptError,
+    decrypt_backup,
+    encrypt_backup,
+)
 from signal_backup_decrypt.keys import (
     derive_backup_key,
     derive_local_backup_metadata_key,
@@ -40,7 +44,9 @@ def test_recover_backup_id():
 
     backup_id = bytes(range(16))
     iv = os.urandom(12)  # Aes256Ctr32 uses a 12-byte nonce
-    enc = Cipher(algorithms.AES(metadata_key), modes.CTR(iv + b"\x00\x00\x00\x00")).encryptor()
+    enc = Cipher(
+        algorithms.AES(metadata_key), modes.CTR(iv + b"\x00\x00\x00\x00")
+    ).encryptor()
     ct = enc.update(backup_id) + enc.finalize()
 
     metadata = _build_metadata(iv, ct)
@@ -51,7 +57,10 @@ def test_recover_backup_id():
 def test_build_metadata_round_trips():
     backup_key = derive_backup_key(AEP)
     backup_id = os.urandom(16)
-    assert recover_backup_id(build_metadata(backup_id, backup_key), backup_key) == backup_id
+    assert (
+        recover_backup_id(build_metadata(backup_id, backup_key), backup_key)
+        == backup_id
+    )
 
 
 def test_rekey_snapshot(tmp_path):

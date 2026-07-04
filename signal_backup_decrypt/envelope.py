@@ -42,7 +42,9 @@ def has_forward_secrecy(data: bytes) -> bool:
 def decrypt_backup(data: bytes, key: MessageBackupKey) -> bytes:
     """Verify the HMAC, decrypt, and decompress; return the plaintext frame stream."""
     if has_forward_secrecy(data):
-        raise BackupDecryptError("backup uses forward secrecy (SBACKUP magic) — unsupported")
+        raise BackupDecryptError(
+            "backup uses forward secrecy (SBACKUP magic) — unsupported"
+        )
     if len(data) < IV_LEN + HMAC_LEN:
         raise BackupDecryptError("file too short to be an encrypted backup")
 
@@ -60,8 +62,10 @@ def decrypt_backup(data: bytes, key: MessageBackupKey) -> bytes:
 
     inflater = zlib.decompressobj(wbits=_GZIP_WBITS)
     plaintext = inflater.decompress(padded)
-    plaintext += inflater.flush()  # ponytail: whole plaintext in memory; ok since v2 message
-    return plaintext                #           backups hold text+metadata only (media is separate).
+    plaintext += (
+        inflater.flush()
+    )  # ponytail: whole plaintext in memory; ok since v2 message
+    return plaintext  #           backups hold text+metadata only (media is separate).
 
 
 def encrypt_backup(plaintext: bytes, key: MessageBackupKey) -> bytes:

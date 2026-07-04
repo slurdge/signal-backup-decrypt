@@ -20,9 +20,11 @@ def _to_dict(msg) -> dict:
 
 
 def _direction(item: backup_pb2.ChatItem) -> str:
-    return {"incoming": "incoming", "outgoing": "outgoing", "directionless": "update"}.get(
-        item.WhichOneof("directionalDetails") or "", "unknown"
-    )
+    return {
+        "incoming": "incoming",
+        "outgoing": "outgoing",
+        "directionless": "update",
+    }.get(item.WhichOneof("directionalDetails") or "", "unknown")
 
 
 def export_json(backup: Backup, out_dir: Path) -> Path:
@@ -51,8 +53,13 @@ def export_json(backup: Backup, out_dir: Path) -> Path:
             json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8"
         )
         chats_meta.append(
-            {"id": chat.id, "name": name, "recipientId": chat.recipientId,
-             "messageCount": len(items), "file": filename}
+            {
+                "id": chat.id,
+                "name": name,
+                "recipientId": chat.recipientId,
+                "messageCount": len(items),
+                "file": filename,
+            }
         )
 
     manifest = {
@@ -64,7 +71,11 @@ def export_json(backup: Backup, out_dir: Path) -> Path:
             "messages": sum(len(v) for v in backup.messages.values()),
         },
         "recipients": [
-            {"id": rid, "type": r.WhichOneof("destination"), "name": backup.display_name(rid)}
+            {
+                "id": rid,
+                "type": r.WhichOneof("destination"),
+                "name": backup.display_name(rid),
+            }
             for rid, r in sorted(backup.recipients.items())
         ],
         "chats": chats_meta,

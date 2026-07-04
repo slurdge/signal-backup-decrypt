@@ -29,7 +29,9 @@ def read_varint(buf, pos: int) -> tuple[int, int]:
             raise ValueError("varint too long")
 
 
-def read_frames(plaintext: bytes) -> tuple[backup_pb2.BackupInfo, Iterator[backup_pb2.Frame]]:
+def read_frames(
+    plaintext: bytes,
+) -> tuple[backup_pb2.BackupInfo, Iterator[backup_pb2.Frame]]:
     """Return (BackupInfo, iterator of Frames) over the decrypted plaintext."""
     view = memoryview(plaintext)
     length, pos = read_varint(view, 0)

@@ -53,10 +53,12 @@ def _msg(chat_id, author_id, ts, body, incoming=True):
 def test_clustering_marks_same_sender_runs(tmp_path):
     t0 = 1700000000000
     frames = _frames() + [
-        _msg(10, 2, t0 + 1_000, "second in a row"),          # joins the fixture's first msg
+        _msg(10, 2, t0 + 1_000, "second in a row"),  # joins the fixture's first msg
         _msg(10, 2, t0 + 2_000, "third in a row"),
-        _msg(10, 1, t0 + 3_000, "reply", incoming=False),     # direction flips: new block
-        _msg(10, 2, t0 + 10 * 60 * 1000, "much later"),       # same sender, but too far apart
+        _msg(10, 1, t0 + 3_000, "reply", incoming=False),  # direction flips: new block
+        _msg(
+            10, 2, t0 + 10 * 60 * 1000, "much later"
+        ),  # same sender, but too far apart
     ]
     backup = Backup.from_frames(backup_pb2.BackupInfo(version=1), frames)
     html = export_html(backup, tmp_path).read_text(encoding="utf-8")
@@ -64,7 +66,9 @@ def test_clustering_marks_same_sender_runs(tmp_path):
     # " joined-*" with the leading space matches the class attribute, not the CSS rules.
     assert html.count(" joined-prev") == 2  # 2nd and 3rd bubble continue the run
     assert html.count(" joined-next") == 2  # 1st and 2nd bubble are continued
-    assert 'class="row out joined' not in html  # the reply and the late message stand alone
+    assert (
+        'class="row out joined' not in html
+    )  # the reply and the late message stand alone
     # Time only on the last bubble of each run: the 3-run shows one, the two loners one each.
     assert html.count('class="time') == 3
 
@@ -78,28 +82,38 @@ def test_reactions_grouped_with_hover_names(tmp_path):
     backup = Backup.from_frames(backup_pb2.BackupInfo(version=1), frames)
     html = export_html(backup, tmp_path).read_text(encoding="utf-8")
 
-    assert '<span title="You, Alice">❤ 2</span>' in html  # collapsed, counted, names on hover
-    assert '<span title="Alice">😀</span>' in html         # single reaction: no counter
-    assert "Note to Self" not in html                      # owner reads "You", not the chat title
+    assert (
+        '<span title="You, Alice">❤ 2</span>' in html
+    )  # collapsed, counted, names on hover
+    assert '<span title="Alice">😀</span>' in html  # single reaction: no counter
+    assert "Note to Self" not in html  # owner reads "You", not the chat title
 
 
 def test_links_and_youtube(tmp_path):
     frames = _frames() + [
-        _msg(10, 2, 1700000100000,
-             "see https://example.com/a. then https://youtu.be/dQw4w9WgXcQ ok"),
+        _msg(
+            10,
+            2,
+            1700000100000,
+            "see https://example.com/a. then https://youtu.be/dQw4w9WgXcQ ok",
+        ),
     ]
     backup = Backup.from_frames(backup_pb2.BackupInfo(version=1), frames)
     html = export_html(backup, tmp_path).read_text(encoding="utf-8")
 
     # Bare URLs become links; trailing sentence punctuation stays outside the href.
-    assert ('<a href="https://example.com/a" target="_blank" rel="noopener">'
-            "https://example.com/a</a>.") in html
+    assert (
+        '<a href="https://example.com/a" target="_blank" rel="noopener">'
+        "https://example.com/a</a>."
+    ) in html
     assert 'data-id="dQw4w9WgXcQ"' in html  # click-to-load YouTube placeholder
     assert 'id="lightbox"' in html
 
 
 def test_linkify_escapes_html(tmp_path):
-    frames = _frames() + [_msg(10, 2, 1700000100000, "<b>bold?</b> https://e.com/?a=1&b=2")]
+    frames = _frames() + [
+        _msg(10, 2, 1700000100000, "<b>bold?</b> https://e.com/?a=1&b=2")
+    ]
     backup = Backup.from_frames(backup_pb2.BackupInfo(version=1), frames)
     html = export_html(backup, tmp_path).read_text(encoding="utf-8")
     assert "<b>bold?</b>" not in html  # message text is still escaped
@@ -114,4 +128,6 @@ def test_date_headers_one_per_day(tmp_path):
     ]
     backup = Backup.from_frames(backup_pb2.BackupInfo(version=1), frames)
     html = export_html(backup, tmp_path).read_text(encoding="utf-8")
-    assert html.count('class="date-header"') == 2  # one per distinct day, not per message
+    assert (
+        html.count('class="date-header"') == 2
+    )  # one per distinct day, not per message

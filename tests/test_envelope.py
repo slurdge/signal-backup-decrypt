@@ -10,7 +10,12 @@ import pytest
 from cryptography.hazmat.primitives import padding
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 
-from signal_backup_decrypt.envelope import MAGIC, BackupDecryptError, decrypt_backup, encrypt_backup
+from signal_backup_decrypt.envelope import (
+    MAGIC,
+    BackupDecryptError,
+    decrypt_backup,
+    encrypt_backup,
+)
 from signal_backup_decrypt.frames import read_frames
 from signal_backup_decrypt.keys import MessageBackupKey
 from signal_backup_decrypt.proto import backup_pb2

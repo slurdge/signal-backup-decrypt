@@ -44,7 +44,9 @@ def _decrypt(blob: bytes, local_key: bytes, size: int) -> bytes:
     if not hmac.compare_digest(hmac.new(mac_key, body, "sha256").digest(), tag):
         raise MediaError("attachment MAC mismatch")
     iv, ciphertext = body[:16], body[16:]
-    plain = Cipher(algorithms.AES(aes_key), modes.CBC(iv)).decryptor().update(ciphertext)
+    plain = (
+        Cipher(algorithms.AES(aes_key), modes.CBC(iv)).decryptor().update(ciphertext)
+    )
     # plain = content(size) + padding-stream zeros + PKCS7; truncating to size recovers the original.
     return plain[:size] if size else plain
 
@@ -61,6 +63,9 @@ class MediaExtractor:
         self.files_dir = files_dir
         self.out_dir = out_dir
         self.force = force
+        self.on_extract = (
+            None  # optional no-arg callback, fired per extract() (progress bars)
+        )
         self._cache: dict[str, dict | None] = {}
         self.decrypted = 0
         self.reused = 0
@@ -69,6 +74,8 @@ class MediaExtractor:
 
     def extract(self, pointer: backup_pb2.FilePointer) -> dict | None:
         """Return {src, kind, contentType, fileName} for a FilePointer, or None if unavailable."""
+        if self.on_extract is not None:
+            self.on_extract()
         loc = pointer.locatorInfo
         if not loc.localKey or loc.WhichOneof("integrityCheck") != "plaintextHash":
             return None  # not a locally-stored, downloaded attachment
