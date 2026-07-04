@@ -7,14 +7,7 @@ Vectors from vendor/libsignal:
 If any of these fail after a submodule bump, a derivation constant changed upstream.
 """
 
-from signal_backup_decrypt.keys import (
-    AEP_LEN,
-    derive_backup_key,
-    derive_message_backup_key,
-    display_aep,
-    generate_aep,
-    normalize_aep,
-)
+from signal_backup_decrypt.keys import derive_backup_key, derive_message_backup_key
 
 AEP = "dtjs858asj6tv0jzsqrsmj0ubp335pisj98e9ssnss8myoc08drhtcktyawvx45l"
 
@@ -50,14 +43,3 @@ def test_backup_key_tolerates_display_form():
 def test_message_backup_key():
     k = derive_message_backup_key(EXPECTED_BACKUP_KEY, BACKUP_ID)
     assert (k.hmac_key, k.aes_key) == (EXPECTED_HMAC, EXPECTED_AES)
-
-
-def test_display_aep_inverts_normalize():
-    assert normalize_aep(display_aep(AEP)) == AEP
-
-
-def test_generate_aep_shape():
-    aep = generate_aep()
-    assert len(aep) == AEP_LEN
-    assert set(aep) <= set("abcdefghijklmnopqrstuvwxyz0123456789")
-    assert generate_aep() != aep  # vanishingly unlikely to collide

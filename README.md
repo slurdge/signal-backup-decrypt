@@ -41,8 +41,9 @@ uv run signal-backup decrypt data -o frames.bin
 uv run signal-backup change-key data
 ```
 
-The AEP is read from `--aep`, else the `SIGNAL_AEP` environment variable, else an interactive
-prompt (keeps it out of shell history).
+The AEP is read from the `SIGNAL_AEP` environment variable, else a hidden interactive prompt.
+There is deliberately no command-line flag for it: a key typed as an argument would end up in
+the shell history.
 
 ## How the encryption works (findings)
 

@@ -32,8 +32,8 @@ def _fail(msg: str):
     raise SystemExit(1)
 
 
-def _get_aep(args) -> str:
-    aep = args.aep or os.environ.get("SIGNAL_AEP")
+def _get_aep() -> str:
+    aep = os.environ.get("SIGNAL_AEP")
     if not aep:
         aep = Prompt.ask(
             "Account Entropy Pool (recovery key)", password=True, console=console
@@ -64,7 +64,7 @@ def _decrypt_to_frames(args):
     from .local import message_key_for_snapshot
 
     snapshot = _find_snapshot(args)
-    aep = _get_aep(args)
+    aep = _get_aep()
     key = message_key_for_snapshot(snapshot, aep)
     data = (snapshot / "main").read_bytes()
     if has_forward_secrecy(data):
@@ -173,7 +173,7 @@ def _cmd_change_key(args):
 
     new_aep = generate_aep()
     with console.status("Re-encrypting under the new key…"):
-        rekey_snapshot(snapshot, _get_aep(args), new_aep, out_dir)
+        rekey_snapshot(snapshot, _get_aep(), new_aep, out_dir)
     console.print(f"[green]✓[/] Wrote rekeyed snapshot to [bold]{out_dir}[/]")
     console.print(
         "  Keep it next to the original so the shared files/ media directory is found."
@@ -195,7 +195,7 @@ def _cmd_verify(args):
     from .local import recover_backup_id
 
     snapshot = _find_snapshot(args)
-    aep = _get_aep(args)  # normalized: whitespace stripped, #/= un-swapped, lowercased
+    aep = _get_aep()  # normalized: whitespace stripped, #/= un-swapped, lowercased
     charset = set("abcdefghijklmnopqrstuvwxyz0123456789")
     offenders = sorted(set(aep) - charset)
     if len(aep) != AEP_LEN or offenders:
@@ -255,9 +255,6 @@ def main(argv: list[str] | None = None) -> None:
         p = sub.add_parser(name, help=help_)
         p.add_argument(
             "source", help="local archive folder (the snapshot dir or its parent)"
-        )
-        p.add_argument(
-            "--aep", help="Account Entropy Pool (else $SIGNAL_AEP or prompt)"
         )
         p.add_argument(
             "--no-media", action="store_true", help="skip decrypting attachments (html)"
