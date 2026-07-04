@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
-import argparse
 import os
 from pathlib import Path
+from typing import Annotated, Optional
 
+import typer
 from rich.console import Console
 from rich.panel import Panel
 from rich.progress import (
@@ -26,6 +27,15 @@ from .model import Backup
 console = Console()
 _err = Console(stderr=True)
 
+app = typer.Typer(
+    name="signal-backup",
+    help="Decrypt a new-format (v2) Signal Android backup.",
+    no_args_is_help=True,
+)
+
+_SOURCE = Annotated[Path, typer.Argument(help="local archive folder (the snapshot dir or its parent)")]
+_OUTPUT = Annotated[Optional[Path], typer.Option("-o", "--output")]
+
 
 def _fail(msg: str):
     _err.print(f"[bold red]error:[/] {msg}")
@@ -38,38 +48,32 @@ def _get_aep() -> str:
         aep = Prompt.ask(
             "Account Entropy Pool (recovery key)", password=True, console=console
         )
-    aep = normalize_aep(aep)  # tolerate the grouped, uppercased, display-swapped form
+    aep = normalize_aep(aep)
     if len(aep) != AEP_LEN:
         _fail(f"AEP must be {AEP_LEN} characters after removing spaces, got {len(aep)}")
     return aep
 
 
-def _find_snapshot(args) -> Path:
+def _find_snapshot(source: Path) -> Path:
     from .local import find_snapshot
 
-    path = Path(args.source)
-    if not path.exists():
-        _fail(f"no such directory: {path}")
-    if not path.is_dir():
-        _fail(f"{path} is not a local archive folder (the snapshot dir or its parent)")
-    return find_snapshot(path)
+    if not source.exists():
+        _fail(f"no such directory: {source}")
+    if not source.is_dir():
+        _fail(f"{source} is not a local archive folder (the snapshot dir or its parent)")
+    return find_snapshot(source)
 
 
-def _decrypt_to_frames(args):
-    """Shared: validate inputs, derive keys, decrypt, return (Backup, plaintext, files_dir).
-
-    The source is a local archive: a snapshot folder (or its parent), with the BackupId
-    recovered from the encrypted `metadata` file.
-    """
+def _decrypt_to_frames(source: Path):
     from .local import message_key_for_snapshot
 
-    snapshot = _find_snapshot(args)
+    snapshot = _find_snapshot(source)
     aep = _get_aep()
     key = message_key_for_snapshot(snapshot, aep)
     data = (snapshot / "main").read_bytes()
     if has_forward_secrecy(data):
         _fail("this snapshot's main archive uses forward secrecy (unsupported)")
-    candidate = snapshot.parent / "files"  # shared media directory alongside snapshots
+    candidate = snapshot.parent / "files"
     files_dir = candidate if candidate.is_dir() else None
 
     with console.status("Decrypting and decompressing…"):
@@ -86,7 +90,6 @@ def _decrypt_to_frames(args):
 
 
 def _count_media_refs(backup: Backup) -> int:
-    """How many FilePointers the HTML export will try to resolve (progress bar total)."""
     n = 0
     for items in backup.messages.values():
         for it in items:
@@ -100,22 +103,33 @@ def _count_media_refs(backup: Backup) -> int:
     return n
 
 
-def _cmd_decrypt(args):
-    _, plaintext, _ = _decrypt_to_frames(args)
-    out = Path(args.output or "frames.bin")
+@app.command()
+def decrypt(
+    source: _SOURCE,
+    output: _OUTPUT = None,
+) -> None:
+    """Decrypt to the raw plaintext frame stream (debug)."""
+    _, plaintext, _ = _decrypt_to_frames(source)
+    out = output or Path("frames.bin")
     out.write_bytes(plaintext)
     console.print(
         f"[green]✓[/] Wrote {len(plaintext)} bytes of decrypted frame stream to [bold]{out}[/]"
     )
 
 
-def _cmd_json(args):
+@app.command()
+def json(
+    source: _SOURCE,
+    output: _OUTPUT = None,
+    no_media: Annotated[bool, typer.Option("--no-media", help="skip decrypting attachments")] = False,
+) -> None:
+    """Export chats + media as a self-contained zip (backup.zip)."""
     from .json import export_json
 
-    backup, _, files_dir = _decrypt_to_frames(args)
-    out_path = Path(args.output or "backup.zip")
+    backup, _, files_dir = _decrypt_to_frames(source)
+    out_path = output or Path("backup.zip")
 
-    if files_dir and not args.no_media:
+    if files_dir and not no_media:
         with Progress(
             SpinnerColumn(),
             TextColumn("[progress.description]{task.description}"),
@@ -125,29 +139,32 @@ def _cmd_json(args):
             console=console,
         ) as progress:
             task = progress.add_task("Building zip", total=_count_media_refs(backup))
-            data = export_json(
-                backup, files_dir, on_media=lambda: progress.advance(task)
-            )
+            data = export_json(backup, files_dir, on_media=lambda: progress.advance(task))
     else:
         with console.status("Building zip…"):
             data = export_json(backup)
 
     out_path.write_bytes(data)
-    console.print(
-        f"[green]✓[/] Wrote {len(data) / 1e6:.1f} MB zip to [bold]{out_path}[/]"
-    )
+    console.print(f"[green]✓[/] Wrote {len(data) / 1e6:.1f} MB zip to [bold]{out_path}[/]")
 
 
-def _cmd_html(args):
+@app.command()
+def html(
+    source: _SOURCE,
+    output: _OUTPUT = None,
+    no_media: Annotated[bool, typer.Option("--no-media", help="skip decrypting attachments")] = False,
+    force_files: Annotated[bool, typer.Option("--force-files", help="re-decrypt media even if already extracted")] = False,
+) -> None:
+    """Render a browsable HTML archive."""
     from .html import export_html
     from .media import MediaExtractor
 
-    backup, _, files_dir = _decrypt_to_frames(args)
-    out_dir = Path(args.output or "out")
+    backup, _, files_dir = _decrypt_to_frames(source)
+    out_dir = output or Path("out")
 
     media = None
-    if files_dir and not args.no_media:
-        media = MediaExtractor(files_dir, out_dir / "media", force=args.force_files)
+    if files_dir and not no_media:
+        media = MediaExtractor(files_dir, out_dir / "media", force=force_files)
         with Progress(
             SpinnerColumn(),
             TextColumn("[progress.description]{task.description}"),
@@ -174,17 +191,17 @@ def _cmd_html(args):
     console.print(f"[green]✓[/] Wrote HTML to [bold]{index}[/] — open it in a browser")
 
 
-def _cmd_change_key(args):
-    """Re-encrypt the archive under a fresh random key, so tests never touch the real AEP."""
+@app.command("change-key")
+def change_key(
+    source: _SOURCE,
+    output: _OUTPUT = None,
+) -> None:
+    """Re-encrypt under a fresh random AEP (for testing)."""
     from .keys import display_aep, generate_aep
     from .local import rekey_snapshot
 
-    snapshot = _find_snapshot(args)
-    out_dir = (
-        Path(args.output)
-        if args.output
-        else snapshot.parent / f"{snapshot.name}-rekeyed"
-    )
+    snapshot = _find_snapshot(source)
+    out_dir = output or snapshot.parent / f"{snapshot.name}-rekeyed"
     if out_dir.resolve() == snapshot.resolve():
         _fail("refusing to rekey the snapshot in place; pick a different -o directory")
 
@@ -204,15 +221,18 @@ def _cmd_change_key(args):
     )
 
 
-def _cmd_verify(args):
-    """Diagnose a local archive without fully decrypting: is the AEP correct?"""
+@app.command()
+def verify(
+    source: _SOURCE,
+) -> None:
+    """Diagnose whether the AEP is correct for the archive."""
     from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 
     from .keys import derive_backup_key, derive_message_backup_key
     from .local import recover_backup_id
 
-    snapshot = _find_snapshot(args)
-    aep = _get_aep()  # normalized: whitespace stripped, #/= un-swapped, lowercased
+    snapshot = _find_snapshot(source)
+    aep = _get_aep()
     charset = set("abcdefghijklmnopqrstuvwxyz0123456789")
     offenders = sorted(set(aep) - charset)
     if len(aep) != AEP_LEN or offenders:
@@ -253,48 +273,8 @@ def _cmd_verify(args):
 
 
 def main(argv: list[str] | None = None) -> None:
-    parser = argparse.ArgumentParser(
-        prog="signal-backup",
-        description="Decrypt a new-format (v2) Signal Android backup.",
-    )
-    sub = parser.add_subparsers(dest="cmd", required=True)
-    for name, handler, help_ in (
-        ("decrypt", _cmd_decrypt, "decrypt to the raw plaintext frame stream (debug)"),
-        (
-            "json",
-            _cmd_json,
-            "export chats + media as a self-contained zip (backup.zip)",
-        ),
-        ("html", _cmd_html, "render a browsable HTML archive"),
-        ("verify", _cmd_verify, "diagnose whether the AEP is correct for the archive"),
-        (
-            "change-key",
-            _cmd_change_key,
-            "re-encrypt under a fresh random AEP (for testing)",
-        ),
-    ):
-        p = sub.add_parser(name, help=help_)
-        p.add_argument(
-            "source", help="local archive folder (the snapshot dir or its parent)"
-        )
-        p.add_argument(
-            "--no-media", action="store_true", help="skip decrypting attachments (html)"
-        )
-        p.add_argument(
-            "--force-files",
-            action="store_true",
-            help="re-decrypt media even if the output file already exists (html)",
-        )
-        p.add_argument(
-            "-o",
-            "--output",
-            help="output path: file for decrypt/json, directory for html/change-key",
-        )
-        p.set_defaults(func=handler)
-
-    args = parser.parse_args(argv)
     try:
-        args.func(args)
+        app(args=argv)
     except BackupDecryptError as e:
         _fail(str(e))
 
