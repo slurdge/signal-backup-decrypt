@@ -4,19 +4,41 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Signal backup</title>
+<script>
+  /* Set the theme before first paint: saved choice, else the OS preference. */
+  document.documentElement.dataset.theme =
+    localStorage.getItem('theme') ||
+    (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+</script>
 <style>
-  :root { --blue:#2c6bed; --grey:#f0f0f0; --line:#e4e4e7; --muted:#6b7280; }
+  :root {
+    --accent:#2c6bed;
+    --bg:#ffffff; --bg-side:#fafafa; --bg-hover:#ececec; --bg-active:#e8effe;
+    --text:#111111; --muted:#6b7280; --line:#e4e4e7;
+    --bubble-in:#e9e9e9; --text-in:#111111;
+    --bubble-out:var(--accent); --text-out:#ffffff; --time-out:#cfdffe;
+    --pill:#ffffff; --quote-bg:rgba(0,0,0,.05);
+  }
+  :root[data-theme="dark"] {
+    --bg:#151617; --bg-side:#1c1d1f; --bg-hover:#26282b; --bg-active:#2f3238;
+    --text:#eeeeee; --muted:#9ca3af; --line:#2c2d31;
+    --bubble-in:#2f3033; --text-in:#eeeeee;
+    --bubble-out:var(--accent); --text-out:#ffffff; --time-out:#cfdffe;
+    --pill:#1c1d1f; --quote-bg:rgba(255,255,255,.07);
+  }
   * { box-sizing: border-box; }
   body { margin:0; font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
-         color:#111; height:100vh; display:flex; }
+         color:var(--text); background:var(--bg); height:100vh; display:flex; }
   #sidebar { width:320px; min-width:260px; border-right:1px solid var(--line);
-             overflow-y:auto; background:#fafafa; }
-  #sidebar h1 { font-size:15px; margin:0; padding:16px; border-bottom:1px solid var(--line);
-                color:var(--muted); font-weight:600; }
-  .conv { display:flex; align-items:center; gap:12px; padding:12px 16px; cursor:pointer;
-          border-bottom:1px solid var(--line); }
-  .conv:hover { background:#f0f0f0; }
-  .conv.active { background:#e8effe; }
+             overflow-y:auto; background:var(--bg-side); }
+  #sidebar h1 { font-size:15px; margin:0; padding:14px 16px; border-bottom:1px solid var(--line);
+                color:var(--muted); font-weight:600; display:flex; align-items:center; gap:8px; }
+  #sidebar h1 span { flex:1; }
+  #themeBtn { border:1px solid var(--line); background:var(--bg); color:var(--text);
+              border-radius:8px; cursor:pointer; font-size:14px; padding:2px 8px; }
+  .conv { display:flex; align-items:center; gap:12px; padding:10px 16px; cursor:pointer; }
+  .conv:hover { background:var(--bg-hover); }
+  .conv.active { background:var(--bg-active); }
   .avatar { width:40px; height:40px; border-radius:50%;
             display:flex; align-items:center; justify-content:center; font-weight:600; flex:0 0 auto; }
   .conv .meta { overflow:hidden; }
@@ -24,33 +46,42 @@
   .conv .sub { font-size:12px; color:var(--muted); }
   #main { flex:1; display:flex; flex-direction:column; min-width:0; }
   #main header { padding:14px 20px; border-bottom:1px solid var(--line); font-weight:600; }
-  #thread { flex:1; overflow-y:auto; padding:20px; background:#fff; }
+  #thread { flex:1; overflow-y:auto; padding:16px 20px; background:var(--bg); }
   .chat { display:none; }
   .chat.active { display:block; }
-  .row { display:flex; margin:4px 0; }
+  .row { display:flex; margin-top:10px; }
+  .row.joined-prev { margin-top:2px; }  /* same sender continues: tighten into a block */
   .row.out { justify-content:flex-end; }
   .row.system { justify-content:center; }
-  .bubble { max-width:70%; padding:8px 12px; border-radius:16px; background:var(--grey);
-            white-space:pre-wrap; word-wrap:break-word; }
-  .row.out .bubble { background:var(--blue); color:#fff; }
-  .row.system .note { color:var(--muted); font-size:12px; text-align:center; margin:10px 0; }
-  .author { font-size:12px; font-weight:600; color:var(--blue); margin-bottom:2px; }
-  .time { font-size:11px; color:var(--muted); margin-top:3px; }
-  .row.out .time { color:#dbe7ff; }
+  .bubble { max-width:70%; padding:7px 12px; border-radius:18px; word-wrap:break-word; }
+  .body { white-space:pre-wrap; }  /* only real message text keeps its newlines */
+  .row.in  .bubble { background:var(--bubble-in);  color:var(--text-in); }
+  .row.out .bubble { background:var(--bubble-out); color:var(--text-out); }
+  /* Square the corners on the outer edge inside a run (top/bottom of the block stay round). */
+  .row.in.joined-prev  .bubble { border-top-left-radius:5px; }
+  .row.in.joined-next  .bubble { border-bottom-left-radius:5px; }
+  .row.out.joined-prev .bubble { border-top-right-radius:5px; }
+  .row.out.joined-next .bubble { border-bottom-right-radius:5px; }
+  .row.system .note { color:var(--muted); font-size:12px; text-align:center; margin:8px 0; }
+  .author { font-size:12px; font-weight:600; margin-bottom:2px; color:var(--author-l, var(--accent)); }
+  :root[data-theme="dark"] .author { color:var(--author-d, var(--accent)); }
+  .time { font-size:11px; color:var(--muted); margin-top:3px; text-align:right; }
+  .row.out .time { color:var(--time-out); }
   .note { font-style:italic; opacity:.85; margin-top:2px; }
   .attach { display:block; max-width:260px; max-height:320px; border-radius:12px; margin:2px 0; }
   .attach-file { display:inline-block; margin:2px 0; color:inherit; }
-  .quote { border-left:3px solid var(--blue); padding:2px 8px; margin-bottom:4px;
-           font-size:13px; opacity:.85; }
+  .quote { border-left:3px solid var(--accent); background:var(--quote-bg); border-radius:4px;
+           padding:4px 8px; margin-bottom:4px; font-size:13px; opacity:.9; }
   .reactions { margin-top:3px; }
-  .reactions span { display:inline-block; background:#fff; border:1px solid var(--line);
+  .reactions span { display:inline-block; background:var(--pill); border:1px solid var(--line);
                     border-radius:10px; padding:0 6px; font-size:12px; margin-right:3px; }
   .empty { color:var(--muted); padding:40px; text-align:center; }
 </style>
 </head>
 <body>
 <nav id="sidebar">
-  <h1>{{ chats|length }} conversations · backup {{ backup_time }}</h1>
+  <h1><span>{{ chats|length }} conversations · backup {{ backup_time }}</span>
+      <button id="themeBtn" onclick="toggleTheme()" title="Toggle dark mode">◐</button></h1>
   {% for c in chats %}
   <div class="conv" data-id="{{ c.id }}" onclick="showChat('{{ c.id }}', this)">
     <div class="avatar" style="background:{{ c.avatar_bg }};color:{{ c.avatar_fg }}">{{ c.initial }}</div>
@@ -68,12 +99,12 @@
     <div class="chat" id="chat-{{ c.id }}" data-name="{{ c.name }}">
       {% if not c.messages %}<div class="empty">No messages.</div>{% endif %}
       {% for m in c.messages %}
-      <div class="row {{ m.css }}">
+      <div class="row {{ m.css }}{% if m.joined_prev %} joined-prev{% endif %}{% if m.joined_next %} joined-next{% endif %}">
         {% if m.system %}
           <div class="note">— {{ m.system }} —</div>
         {% else %}
         <div class="bubble">
-          {% if m.css == 'in' %}<div class="author">{{ m.author }}</div>{% endif %}
+          {% if m.show_author %}<div class="author" style="--author-l:{{ m.author_fg }};--author-d:{{ m.author_bg }}">{{ m.author }}</div>{% endif %}
           {% if m.quote %}<div class="quote"><b>{{ m.quote.author }}</b><br>{{ m.quote.text }}</div>{% endif %}
           {% for md in m.media %}
             {% if md.kind == 'image' %}<a href="{{ md.src }}" target="_blank"><img class="attach" src="{{ md.src }}" loading="lazy" alt="{{ md.fileName }}"></a>
@@ -81,7 +112,7 @@
             {% elif md.kind == 'audio' %}<audio src="{{ md.src }}" controls preload="none"></audio>
             {% else %}<a class="attach-file" href="{{ md.src }}" download="{{ md.fileName }}">📎 {{ md.fileName }}</a>{% endif %}
           {% endfor %}
-          {% if m.body %}{{ m.body }}{% endif %}
+          {% if m.body %}<div class="body">{{ m.body }}</div>{% endif %}
           {% for n in m.notes %}<div class="note">{{ n }}</div>{% endfor %}
           {% if m.reactions %}<div class="reactions">{% for r in m.reactions %}<span>{{ r }}</span>{% endfor %}</div>{% endif %}
           <div class="time">{{ m.time }}</div>
@@ -94,6 +125,11 @@
   </div>
 </section>
 <script>
+  function toggleTheme() {
+    const next = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
+    document.documentElement.dataset.theme = next;
+    localStorage.setItem('theme', next);
+  }
   function showChat(id, el) {
     document.querySelectorAll('.chat').forEach(c => c.classList.remove('active'));
     document.querySelectorAll('.conv').forEach(c => c.classList.remove('active'));
@@ -101,7 +137,8 @@
     chat.classList.add('active');
     if (el) el.classList.add('active');
     document.getElementById('title').textContent = chat.dataset.name;
-    document.getElementById('thread').scrollTop = 0;
+    const thread = document.getElementById('thread');
+    thread.scrollTop = thread.scrollHeight;  /* jump to the latest message */
   }
   const first = document.querySelector('.conv');
   if (first) showChat(first.dataset.id, first);

@@ -124,9 +124,16 @@ def _attach(v: dict, media, pointer, fallback: str) -> None:
 def _view(backup: Backup, item: backup_pb2.ChatItem, media=None) -> dict:
     direction = item.WhichOneof("directionalDetails")
     kind = item.WhichOneof("item")
+    author_bg, author_fg = _avatar_colors(backup.recipients.get(item.authorId))
     v = {
         "css": {"incoming": "in", "outgoing": "out"}.get(direction, "system"),
         "author": backup.display_name(item.authorId),
+        "author_fg": author_fg,  # author-name color on light theme
+        "author_bg": author_bg,  # the pastel variant reads better on dark bubbles
+        "show_author": False,    # set per-chat: group chats, first bubble of a run
+        "ts": item.dateSent,
+        "joined_prev": False,
+        "joined_next": False,
         "time": _fmt_time(item.dateSent),
         "body": "",
         "notes": [],
@@ -178,6 +185,25 @@ def _view(backup: Backup, item: backup_pb2.ChatItem, media=None) -> dict:
     return v
 
 
+_CLUSTER_MS = 3 * 60 * 1000  # like the app: same sender within a few minutes reads as one block
+
+
+def _mark_clusters(views: list[dict]) -> None:
+    """Flag bubbles that continue a same-sender run, so CSS can square the inner corners."""
+    def joined(a: dict | None, b: dict | None) -> bool:
+        return (
+            a is not None and b is not None
+            and a["css"] == b["css"] and a["css"] in ("in", "out")
+            and a["author"] == b["author"]
+            and b["ts"] - a["ts"] <= _CLUSTER_MS
+        )
+
+    for prev, cur in zip(views, views[1:]):
+        if joined(prev, cur):
+            prev["joined_next"] = True
+            cur["joined_prev"] = True
+
+
 def export_html(backup: Backup, out_dir: Path, media=None) -> Path:
     out_dir.mkdir(parents=True, exist_ok=True)
     env = Environment(
@@ -189,7 +215,13 @@ def export_html(backup: Backup, out_dir: Path, media=None) -> Path:
     for chat in backup.chats_sorted():
         items = backup.messages.get(chat.id, [])
         name = backup.display_name(chat.recipientId)
-        avatar_bg, avatar_fg = _avatar_colors(backup.recipients.get(chat.recipientId))
+        recipient = backup.recipients.get(chat.recipientId)
+        avatar_bg, avatar_fg = _avatar_colors(recipient)
+        is_group = recipient is not None and recipient.WhichOneof("destination") == "group"
+        views = [_view(backup, it, media) for it in items]
+        _mark_clusters(views)
+        for m in views:  # author names: only in group chats, only atop a run (like the app)
+            m["show_author"] = is_group and m["css"] == "in" and not m["joined_prev"]
         chats.append(
             {
                 "id": chat.id,
@@ -198,7 +230,7 @@ def export_html(backup: Backup, out_dir: Path, media=None) -> Path:
                 "avatar_bg": avatar_bg,
                 "avatar_fg": avatar_fg,
                 "count": len(items),
-                "messages": [_view(backup, it, media) for it in items],
+                "messages": views,
             }
         )
 
